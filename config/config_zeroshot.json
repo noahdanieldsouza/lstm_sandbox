@@ -1,0 +1,8 @@
+{
+    "train_lakes": ["mendota_observed"],
+    "train_fractions": [0.6],
+    "val_lakes": ["mendota_observed"],
+    "val_fractions": [0.2],
+    "test_lakes": ["mendota_observed"],
+    "test_fractions": [0.2]
+}

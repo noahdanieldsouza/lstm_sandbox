@@ -1,0 +1,20 @@
+{
+  "train_lakes": [
+    "ME_obsdata16-23"
+  ],
+  "train_fractions": [
+    0.6
+  ],
+  "val_lakes": [
+    "ME_obsdata16-23"
+  ],
+  "val_fractions": [
+    0.2
+  ],
+  "test_lakes": [
+    "ME_obsdata16-23"
+  ],
+  "test_fractions": [
+    0.2
+  ]
+}
