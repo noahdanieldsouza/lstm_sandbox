@@ -1,0 +1,91 @@
+# ------------------------------
+# Python bytecode / caches
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Unit test / coverage / type-check caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.hypothesis/
+
+# Packaging / build outputs
+build/
+dist/
+site/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ------------------------------
+# Virtual environments
+# ------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ------------------------------
+# IDE / editor / OS files
+# ------------------------------
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Jupyter / notebooks
+# ------------------------------
+.ipynb_checkpoints/
+
+# ------------------------------
+# Streamlit
+# ------------------------------
+.streamlit/secrets.toml
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log
+logs/
+Transfer_Learning/logs/
+
+# ------------------------------
+# Experiment tracking
+# ------------------------------
+wandb/
+**/wandb/
+
+# ------------------------------
+# Model checkpoints / outputs
+# ------------------------------
+*.pth
+*.pt
+Transfer_Learning/pretrain_checkpoints/
+Transfer_Learning/finetune_checkpoints/
+Transfer_Learning/prediction_results/
+Transfer_Learning/horizon_csv_*/
+
+# ------------------------------
+# Generated data artifacts
+# ------------------------------
+*.pkl
+*.joblib
+*.npy
+*.npz
+
+# ------------------------------
+# Local environment files
+# ------------------------------
+.env
+.env.*
+*.local
+python.env

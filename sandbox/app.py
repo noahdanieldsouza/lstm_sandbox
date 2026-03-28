@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 import streamlit as st
+import pandas as pd
 
 from core import build_executor_command, run_experiment, validate_dataset, write_split_config
 from profiles import PROFILES
@@ -15,6 +16,79 @@ st.caption("Dataset swap + hyperparameter experiments for ecologists")
 workspace_root = Path(__file__).resolve().parents[1]
 data_dir = workspace_root / "data"
 config_dir = workspace_root / "config"
+
+if "last_cmd" not in st.session_state:
+    st.session_state.last_cmd = ""
+if "last_output_lines" not in st.session_state:
+    st.session_state.last_output_lines = []
+if "last_predictions_dir" not in st.session_state:
+    st.session_state.last_predictions_dir = ""
+if "last_run_success" not in st.session_state:
+    st.session_state.last_run_success = False
+if "last_run_error" not in st.session_state:
+    st.session_state.last_run_error = ""
+
+
+def render_predictions(predictions_dir: Path, key_prefix: str = "results") -> None:
+    csv_files = sorted(predictions_dir.glob("predictions_*_target_*.csv"))
+    if not csv_files:
+        st.info(f"No prediction CSVs found in {predictions_dir}.")
+        return
+
+    metadata = []
+    for csv_file in csv_files:
+        stem = csv_file.stem
+        if not stem.startswith("predictions_") or "_target_" not in stem:
+            continue
+        split_part, target_name = stem.replace("predictions_", "", 1).split("_target_", 1)
+        metadata.append({"file": csv_file, "split": split_part, "target": target_name})
+
+    if not metadata:
+        st.info("Prediction files exist, but none match expected naming format.")
+        return
+
+    st.subheader("5) Results")
+
+    split_options = sorted({row["split"] for row in metadata})
+    selected_split = st.selectbox("Split", split_options, key=f"{key_prefix}_split")
+
+    target_options = sorted({row["target"] for row in metadata if row["split"] == selected_split})
+    selected_target = st.selectbox("Target", target_options, key=f"{key_prefix}_target")
+
+    selected_file = next(
+        row["file"] for row in metadata if row["split"] == selected_split and row["target"] == selected_target
+    )
+    df_results = pd.read_csv(selected_file)
+
+    horizon_cols = [col for col in df_results.columns if col.startswith("prediction_T")]
+    if not horizon_cols:
+        st.warning("No prediction horizon columns found in selected file.")
+        return
+
+    selected_horizon = st.selectbox("Horizon", horizon_cols, key=f"{key_prefix}_horizon")
+
+    plot_df = df_results[["timestamp", "ground_truth", selected_horizon]].copy()
+    plot_df["timestamp"] = pd.to_datetime(plot_df["timestamp"], errors="coerce")
+    plot_df = plot_df.dropna(subset=["timestamp"]).set_index("timestamp")
+    plot_df = plot_df.rename(
+        columns={
+            "ground_truth": "Actual",
+            selected_horizon: f"Predicted ({selected_horizon})",
+        }
+    )
+
+    if plot_df.empty:
+        st.warning("No plottable rows found after timestamp parsing.")
+        return
+
+    st.line_chart(plot_df, use_container_width=True)
+
+    diff = plot_df[f"Predicted ({selected_horizon})"] - plot_df["Actual"]
+    rmse = (diff.pow(2).mean()) ** 0.5
+    mae = diff.abs().mean()
+    m1, m2 = st.columns(2)
+    m1.metric("RMSE", f"{rmse:.4f}")
+    m2.metric("MAE", f"{mae:.4f}")
 
 with st.sidebar:
     st.header("Run Setup")
@@ -41,8 +115,6 @@ with col2:
 
 if source_filename:
     csv_path = data_dir / source_filename
-    import pandas as pd
-
     df = pd.read_csv(csv_path, nrows=1)
     all_cols: List[str] = list(df.columns)
     feature_defaults = [c for c in quick_targets if c in all_cols]
@@ -174,7 +246,13 @@ if run_clicked:
     if masked_columns:
         cmd.extend(["--masked_columns", *masked_columns])
 
-    st.code(" ".join(cmd))
+    st.session_state.last_cmd = " ".join(cmd)
+    st.session_state.last_output_lines = []
+    st.session_state.last_run_error = ""
+    st.session_state.last_run_success = False
+    st.session_state.last_predictions_dir = ""
+
+    st.code(st.session_state.last_cmd)
 
     output_box = st.empty()
     lines = []
@@ -182,6 +260,33 @@ if run_clicked:
         for line in run_experiment(cmd, cwd=workspace_root / "Transfer_Learning"):
             lines.append(line)
             output_box.code("\n".join(lines[-250:]))
+        st.session_state.last_output_lines = lines[-250:]
         st.success("Experiment completed successfully.")
+
+        predictions_dir = (
+            workspace_root
+            / "Transfer_Learning"
+            / "prediction_results"
+            / f"{run_name}_{model_type}_{task_name}"
+        )
+        st.session_state.last_predictions_dir = str(predictions_dir)
+        st.session_state.last_run_success = True
     except Exception as exc:
+        st.session_state.last_output_lines = lines[-250:]
+        st.session_state.last_run_error = str(exc)
         st.error(str(exc))
+
+if st.session_state.last_cmd:
+    st.subheader("5) Last Run Output")
+    st.code(st.session_state.last_cmd)
+
+    if st.session_state.last_output_lines:
+        st.code("\n".join(st.session_state.last_output_lines))
+
+    if st.session_state.last_run_success:
+        st.success("Experiment completed successfully.")
+    elif st.session_state.last_run_error:
+        st.error(st.session_state.last_run_error)
+
+    if st.session_state.last_predictions_dir and st.session_state.last_run_success:
+        render_predictions(Path(st.session_state.last_predictions_dir), key_prefix="last_results")

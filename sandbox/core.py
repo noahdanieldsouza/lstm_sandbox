@@ -28,7 +28,7 @@ def validate_dataset(csv_path: Path, targets: Iterable[str]) -> ValidationReport
     parseable_datetime = True
     if "datetime" in df.columns:
         try:
-            pd.to_datetime(df["datetime"])
+            df["datetime"].astype("datetime64[ns]")
         except Exception:
             parseable_datetime = False
 

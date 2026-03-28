@@ -277,7 +277,7 @@ class Trainer():
                                                         anneal_strategy=config.anneal_strategy, 
                                                         final_div_factor=config.final_div_factor,
                                                         steps_per_epoch=n_batches, 
-                                                        verbose=False)
+                                                        )
         
         
         wandb.watch(self.model.encoder)
