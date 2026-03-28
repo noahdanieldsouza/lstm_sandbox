@@ -1,11 +1,11 @@
 numpy==1.26.4
 pandas==2.2.3
-pyarrow==17.0.0
+
 numexpr>=2.10.2
 bottleneck>=1.5.0
 wandb
 matplotlib
-torch
+
 tqdm
 streamlit
-reformer-pytorch
+
