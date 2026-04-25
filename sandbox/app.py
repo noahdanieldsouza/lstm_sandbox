@@ -32,6 +32,12 @@ if "run_start_time" not in st.session_state:
     st.session_state.run_start_time = None
 if "run_end_time" not in st.session_state:
     st.session_state.run_end_time = None
+if "last_results_split" not in st.session_state:
+    st.session_state.last_results_split = ""
+if "last_results_target" not in st.session_state:
+    st.session_state.last_results_target = ""
+if "last_results_horizon" not in st.session_state:
+    st.session_state.last_results_horizon = ""
 
 
 def display_run_progress() -> None:
@@ -85,10 +91,16 @@ def render_predictions(predictions_dir: Path, key_prefix: str = "results") -> No
     st.subheader("5) Results")
 
     split_options = sorted({row["split"] for row in metadata})
-    selected_split = st.selectbox("Split", split_options, key=f"{key_prefix}_split")
+    selected_split_key = f"{key_prefix}_split"
+    if selected_split_key not in st.session_state or st.session_state[selected_split_key] not in split_options:
+        st.session_state[selected_split_key] = split_options[0]
+    selected_split = st.selectbox("Split", split_options, key=selected_split_key)
 
     target_options = sorted({row["target"] for row in metadata if row["split"] == selected_split})
-    selected_target = st.selectbox("Target", target_options, key=f"{key_prefix}_target")
+    selected_target_key = f"{key_prefix}_target"
+    if selected_target_key not in st.session_state or st.session_state[selected_target_key] not in target_options:
+        st.session_state[selected_target_key] = target_options[0]
+    selected_target = st.selectbox("Target", target_options, key=selected_target_key)
 
     selected_file = next(
         row["file"] for row in metadata if row["split"] == selected_split and row["target"] == selected_target
@@ -100,7 +112,10 @@ def render_predictions(predictions_dir: Path, key_prefix: str = "results") -> No
         st.warning("No prediction horizon columns found in selected file.")
         return
 
-    selected_horizon = st.selectbox("Horizon", horizon_cols, key=f"{key_prefix}_horizon")
+    selected_horizon_key = f"{key_prefix}_horizon"
+    if selected_horizon_key not in st.session_state or st.session_state[selected_horizon_key] not in horizon_cols:
+        st.session_state[selected_horizon_key] = horizon_cols[0]
+    selected_horizon = st.selectbox("Horizon", horizon_cols, key=selected_horizon_key)
 
     plot_df = df_results[["timestamp", "ground_truth", selected_horizon]].copy()
     plot_df["timestamp"] = pd.to_datetime(plot_df["timestamp"], errors="coerce")
@@ -138,14 +153,15 @@ source_filename = st.selectbox("Choose dataset", available_csvs, index=0 if avai
 
 col1, col2 = st.columns(2)
 with col1:
-    target_cols = st.multiselect(
-        "Target columns",
-        options=[],
-        default=[],
-        help="Load a dataset first, then use quick presets below.",
-    )
+    target_cols = []
+    masked_columns = []
 with col2:
-    quick_target = st.selectbox("Quick target preset", ["poc", "poc,DO_filled,secchi_m"], index=1)
+    quick_target = st.selectbox(
+        "Quick target preset",
+        ["poc", "poc,DO_filled,secchi_m"],
+        index=1,
+        key="quick_target",
+    )
     quick_targets = [c.strip() for c in quick_target.split(",")]
 
 if source_filename:
@@ -155,8 +171,18 @@ if source_filename:
     feature_defaults = [c for c in quick_targets if c in all_cols]
 
     st.write(f"Detected columns: {len(all_cols)}")
-    target_cols = st.multiselect("Target columns", options=all_cols, default=feature_defaults)
-    masked_columns = st.multiselect("Exclude from input features", options=all_cols, default=feature_defaults)
+    target_cols = st.multiselect(
+        "Target columns",
+        options=all_cols,
+        default=feature_defaults,
+        key="target_cols",
+    )
+    masked_columns = st.multiselect(
+        "Exclude from input features",
+        options=all_cols,
+        default=feature_defaults,
+        key="masked_columns",
+    )
 
     report = validate_dataset(csv_path, target_cols)
     if report.ok:
