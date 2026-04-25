@@ -134,7 +134,7 @@ class Utils:
             '''
             print(f"Splitting for {split} and for lake = {lake}")
             
-            lakename, dtype = lake.split('_')
+            lakename, dtype = lake.rsplit('_', 1)
 
             df_temp = df.copy(deep=True)
             num_samples = df_temp.shape[0]

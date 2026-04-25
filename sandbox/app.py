@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List
+import time
 
 import streamlit as st
 import pandas as pd
@@ -27,6 +28,40 @@ if "last_run_success" not in st.session_state:
     st.session_state.last_run_success = False
 if "last_run_error" not in st.session_state:
     st.session_state.last_run_error = ""
+if "run_start_time" not in st.session_state:
+    st.session_state.run_start_time = None
+if "run_end_time" not in st.session_state:
+    st.session_state.run_end_time = None
+
+
+def display_run_progress() -> None:
+    """Display elapsed time during and after run with status."""
+    if st.session_state.run_start_time is None:
+        return
+    
+    end_time = st.session_state.run_end_time or time.time()
+    elapsed = int(end_time - st.session_state.run_start_time)
+    minutes, seconds = divmod(elapsed, 60)
+    time_str = f"{minutes}m {seconds}s"
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.session_state.run_end_time is None:
+            st.write("🔄 Running...")
+        else:
+            if st.session_state.last_run_success:
+                st.write("✅")
+            else:
+                st.write("❌")
+    
+    with col2:
+        if st.session_state.run_end_time is None:
+            st.write(f"Elapsed: {time_str}")
+        else:
+            if st.session_state.last_run_success:
+                st.write(f"Completed in {time_str}")
+            else:
+                st.write(f"Failed after {time_str}")
 
 
 def render_predictions(predictions_dir: Path, key_prefix: str = "results") -> None:
@@ -254,13 +289,35 @@ if run_clicked:
 
     st.code(st.session_state.last_cmd)
 
-    output_box = st.empty()
+    st.session_state.run_start_time = time.time()
+    st.session_state.run_end_time = None
+    
+    progress_placeholder = st.empty()
+    
+    with progress_placeholder:
+        display_run_progress()
+    
     lines = []
+    last_update_time = time.time()
+    
     try:
         for line in run_experiment(cmd, cwd=workspace_root / "Transfer_Learning"):
             lines.append(line)
-            output_box.code("\n".join(lines[-250:]))
+            
+            # Update progress display every 0.5 seconds
+            current_time = time.time()
+            if current_time - last_update_time > 0.5:
+                with progress_placeholder:
+                    display_run_progress()
+                last_update_time = current_time
+        
         st.session_state.last_output_lines = lines[-250:]
+        st.session_state.run_end_time = time.time()
+        st.session_state.last_run_success = True
+        
+        with progress_placeholder:
+            display_run_progress()
+        
         st.success("Experiment completed successfully.")
 
         predictions_dir = (
@@ -270,23 +327,31 @@ if run_clicked:
             / f"{run_name}_{model_type}_{task_name}"
         )
         st.session_state.last_predictions_dir = str(predictions_dir)
-        st.session_state.last_run_success = True
     except Exception as exc:
         st.session_state.last_output_lines = lines[-250:]
+        st.session_state.run_end_time = time.time()
         st.session_state.last_run_error = str(exc)
+        
+        with progress_placeholder:
+            display_run_progress()
+        
         st.error(str(exc))
 
 if st.session_state.last_cmd:
-    st.subheader("5) Last Run Output")
-    st.code(st.session_state.last_cmd)
-
-    if st.session_state.last_output_lines:
-        st.code("\n".join(st.session_state.last_output_lines))
-
+    st.subheader("5) Results")
+    
     if st.session_state.last_run_success:
         st.success("Experiment completed successfully.")
     elif st.session_state.last_run_error:
         st.error(st.session_state.last_run_error)
-
+    
     if st.session_state.last_predictions_dir and st.session_state.last_run_success:
         render_predictions(Path(st.session_state.last_predictions_dir), key_prefix="last_results")
+    
+    with st.expander("View Run Details"):
+        st.subheader("Command")
+        st.code(st.session_state.last_cmd)
+        
+        if st.session_state.last_output_lines:
+            st.subheader("Logs")
+            st.code("\n".join(st.session_state.last_output_lines))
